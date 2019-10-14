@@ -1,0 +1,120 @@
+#!/usr/bin/python
+#-*- coding:utf-8 -*-
+
+import errno
+import os
+import platform
+import re
+import subprocess
+import sys
+import time
+
+def getLastInfo():
+    try:
+        args = ['git', '--version']
+        pattern = re.compile(r'\D+(\d+)[.](\d+)[.](\d+)')
+        data = subprocess.check_output(args, stderr=subprocess.STDOUT).strip().decode('utf-8')
+        match = pattern.match(data)
+        if match:
+            major = int(match.group(1))
+            minor = int(match.group(2))
+            if (major >= 2 and minor >= 2):
+                args = ['git', 'log', '--pretty=format:%H%ai%ci', '-1']
+                return subprocess.check_output(args, stderr=subprocess.STDOUT).strip().decode('utf-8')
+            else:
+                args = ['git', 'log', '--pretty=format:%H%ai%ci', '-1']
+                data = subprocess.check_output(args, stderr=subprocess.STDOUT).strip()
+                return data[:50] + ' ' + data[51:59] + data[60:63] + ':' + data[63:75] + ' ' + data[76:84] + data[85:88] + ':' + data[88:90]
+
+    except subprocess.CalledProcessError as e:
+        print('Error: ' + e.output)
+
+    except OSError as e:
+        if errno.ENOENT == e.errno:
+            print('Command Not Found: ' + args[0])
+        else:
+            print(e)
+
+    sys.exit(1)
+
+def localtime():
+    try:
+        if platform.system() == 'Windows':
+            args = ['WMIC', 'OS', 'GET', 'LocalDateTime']
+            date = subprocess.check_output(args, stderr=subprocess.STDOUT).strip().decode('utf-8')
+            pattern = re.compile(r'\D+(\d+)[.]\d+([+])(\d+)')
+            match = pattern.match(date)
+            if match:
+                dt = match.group(1)
+                tz = match.group(2)
+                tzs = int(match.group(3))
+                tzh = '{:02d}'.format(tzs // 60)
+                tzm = '{:02d}'.format(tzs % 60)
+                return dt[:4] + '-' + dt[4:6] + '-' + dt[6:8] + ' ' \
+                    + dt[8:10] + ':' + dt[10:12] + ':' + dt[12:14] + tz + tzh + ':' + tzm
+        else:
+            args = ['date', '+%G-%m-%d %H:%M:%S %z']
+            date = subprocess.check_output(args, stderr=subprocess.STDOUT)
+            if ':' != date[23]:
+                date = date[:22] + r':' + date[22:]
+            return date.strip()
+
+    except subprocess.CalledProcessError as e:
+        print('Error: ' + e.output)
+
+    except OSError as e:
+        if errno.ENOENT == e.errno:
+            print('Command Not Found: ' + args[0])
+        else:
+            print(e)
+
+    sys.exit(2)
+
+if __name__ == '__main__':
+    scriptTarget = os.path.abspath(sys.argv[0]);
+    target = os.path.dirname(os.path.dirname(scriptTarget))
+    os.chdir(os.path.dirname(target))
+
+    try:
+        info = getLastInfo()
+        commitID =   info[:40]
+        amendTime =  info[40:65]
+        commitTime = info[65:]
+        # buildTime =  localtime()
+        buildTime = time.strftime("%Y-%m-%d %H:%M:%S %z", time.localtime())
+
+        with open(target + '/version.h', 'w') as f:
+            f.write('#ifndef VERSION_H\n')
+            f.write('#define VERSION_H\n')
+            f.write('\n')
+            f.write('#define GIT_COMMIT_ID   \"' + commitID   + '\"\n')
+            f.write('#define GIT_COMMIT_TIME \"' + commitTime + '\"\n')
+            f.write('#define GIT_AMEND_TIME  \"' + amendTime  + '\"\n')
+            f.write('#define GIT_BUILD_TIME  \"' + buildTime  + '\"\n')
+            f.write('\n')
+            f.write('#endif//VERSION_H\n')
+
+    except SystemExit as e:
+        with open(target + '/version.h', 'w') as f:
+            f.write('#ifndef VERSION_H\n')
+            f.write('#define VERSION_H\n')
+            f.write('\n')
+            r = str(e.args[0])
+            if '1' == r:
+                f.write('#Error "Command Not Found: \'git\'"\n')
+            elif '2' == r:
+                f.write('#Error "Command Not Found: \'date\'"\n')
+            else:
+                f.write('#Error "Unknown Value: \'' + r + '"\n')
+
+            f.write('\n')
+            f.write('#define GIT_COMMIT_ID   \"\"\n')
+            f.write('#define GIT_COMMIT_TIME \"\"\n')
+            f.write('#define GIT_AMEND_TIME  \"\"\n')
+            f.write('#define GIT_BUILD_TIME  \"\"\n')
+            f.write('\n')
+            f.write('#endif//VERSION_H\n')
+
+        exit(e.args[0])
+
+    sys.exit()
