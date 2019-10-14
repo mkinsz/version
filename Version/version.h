@@ -1,9 +1,0 @@
-#ifndef VERSION_H
-#define VERSION_H
-
-#define GIT_COMMIT_ID   "ebfba536ba9aa54ddd2d7558af1ceed397abbf1a"
-#define GIT_COMMIT_TIME "2019-10-14 14:16:24 +0800"
-#define GIT_AMEND_TIME  "2019-10-14 14:16:24 +0800"
-#define GIT_BUILD_TIME  "2019-10-14 14:22:05 +0800"
-
-#endif//VERSION_H
